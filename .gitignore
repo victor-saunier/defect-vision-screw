@@ -1,0 +1,15 @@
+# Environnement virtuel Python
+venv/
+.env/
+
+# Cache Python
+__pycache__/
+*.py[cod]
+
+# Données lourdes MVTec (ne se versionnent pas sur Git)
+data/
+*.tar.xz
+
+# Modèles volumineux
+*.onnx
+weights/
