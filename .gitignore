@@ -11,5 +11,5 @@ data/
 *.tar.xz
 
 # Modèles volumineux
-*.onnx
 weights/
+models/
