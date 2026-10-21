@@ -23,7 +23,7 @@ def evaluate_pipeline():
 
     # 2. Construction de la mémoire de référence
     detector = PatchAnomalyDetector()
-    detector.fit(train_loader, subsample_ratio=0.10)
+    detector.fit(train_loader, subsample_ratio=0.20)
 
     # 3. Inférence sur le jeu de test complet
     print("\n[INFO] Inférence sur les pièces de test (saines et défectueuses)...")
