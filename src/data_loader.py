@@ -14,7 +14,7 @@ class ScrewDataset(Dataset):
         self.root_dir = Path(root_dir)
         self.split = split
         self.image_paths = []
-        self.labels = []  # 0 pour nominal (good), 1 pour défectueux
+        self.labels = []  # 0 pour good, 1 pour défectueux
 
         # Normalisation standard requise par les modèles pré-entraînés PyTorch
         self.transform = transforms.Compose([
