@@ -44,7 +44,7 @@ Continuous anomaly heatmap generated via intermediate feature space deviation (l
 
 ## Key Performance Results
 
-| Metric | PyTorch Baseline | With Local Aggregation (Ours) | Target / Requirement |
+| Metric | PyTorch Baseline | Feature Aggregation (Optimized) | Target / Requirement |
 | :--- | :---: | :---: | :---: |
 | **AUROC (Overall)** | 82.74 % | **90.84 %** | > 90.0 % |
 | **Precision** | 94.83 % | **96.00 %** | Low False Alarm Rate |
@@ -184,7 +184,7 @@ defect-vision-screw/
 
 ```powershell
 
-git clone https://github.com/<your-username>/defect-vision-screw.git
+git clone https://github.com/victor-saunier/defect-vision-screw.git
 
 cd defect-vision-screw
 
