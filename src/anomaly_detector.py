@@ -34,12 +34,13 @@ class PatchAnomalyDetector:
         patches = features.permute(0, 2, 3, 1).reshape(-1, c)
         return patches
 
-    def fit(self, train_loader, subsample_ratio: float = 0.1):
+    def fit(self, train_loader, subsample_ratio: float = 0.1, seed: int = 0):
         """
         Construit la banque de référence à partir des images saines (train/good).
         subsample_ratio permet de sous-échantillonner les patchs pour optimiser la mémoire CPU.
         """
         print("[INFO] Extraction des descripteurs nominaux (Train)...")
+        torch.manual_seed(seed)  # sous-échantillonnage reproductible
         collected_patches = []
 
         for i, (images, _, _) in enumerate(train_loader):
