@@ -29,12 +29,15 @@ class OpticalInspector:
         detector: PatchAnomalyDetector,
         score_threshold: float = 1.70,     # Seuil d'anomalie brut issu de evaluate.py
         min_defect_area_px: int = 40,
-        pixel_to_mm_ratio: float = 0.05
+        pixel_to_mm_ratio: float = 0.05,   # mm par pixel de l'image d'origine (1024 px)
+        native_size: int = 1024,
+        img_size: int = 224
     ):
         self.detector = detector
         self.score_threshold = score_threshold
         self.min_defect_area_px = min_defect_area_px
-        self.pixel_to_mm_ratio = pixel_to_mm_ratio
+        # Les aires sont mesurées sur l'image redimensionnée : on ramène 1 px à l'échelle d'origine
+        self.pixel_to_mm_ratio = pixel_to_mm_ratio * native_size / img_size
 
     def _compute_raw_anomaly_map(self, image_tensor: torch.Tensor) -> np.ndarray:
         self.detector.extractor.eval()
