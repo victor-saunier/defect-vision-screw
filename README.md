@@ -46,10 +46,10 @@ Continuous anomaly heatmap generated via intermediate feature space deviation (l
 
 | Metric | PyTorch Baseline | Feature Aggregation (Optimized) | Target / Requirement |
 | :--- | :---: | :---: | :---: |
-| **AUROC (Overall)** | 82.74 % | **90.84 %** | > 90.0 % |
-| **Precision** | 94.83 % | **96.00 %** | Low False Alarm Rate |
-| **Defect Sensitivity (Recall)** | 46.22 % | **60.50 %** | High Defect Capture |
-| **F1-Score** | 62.15 % | **74.23 %** | Balanced Performance |
+| **AUROC (Overall)** | 82.74 % | **92.11 %** | > 90.0 % |
+| **Precision** | 94.83 % | **95.79 %** | Low False Alarm Rate |
+| **Defect Sensitivity (Recall)** | 46.22 % | **76.47 %** | High Defect Capture |
+| **F1-Score** | 62.15 % | **85.05 %** | Balanced Performance |
 
 ### Inference Latency Benchmark (Intel/AMD CPU)
 
@@ -96,7 +96,7 @@ Input Frame (224x224x3)
 
          ▼
 
-[Raw Anomaly Heatmap] ──────────► Absolute metric thresholding (> 1.70 distance)
+[Raw Anomaly Heatmap] ──────────► Absolute metric thresholding (calibrated on held-out nominal parts)
 
          │
 
@@ -260,6 +260,6 @@ python benchmark_latency.py
 
 * **Noise Rejection via Spatial Pooling:** Mitigates high-frequency surface noise and specular reflection by applying local neighborhood pooling (`AvgPool2d`, kernel=3) on intermediate feature representations.
 
-* **Calibrated Physical Metrology:** Converts segmented pixel clusters into physical surface measurements (mm²) using an optical calibration factor (50 µm / pixel), eliminating edge artifacts via calibrated absolute Euclidean distance thresholding.
+* **Calibrated Physical Metrology:** Converts segmented pixel clusters into physical surface measurements (mm²) using an optical calibration factor (50 µm / pixel), with the threshold calibrated (95th percentile) on a held-out split of nominal training parts, never on the test set, and areas rescaled to the native 1024 px resolution.
 
 * **Edge-Optimized Runtime:** Eliminates autograd overhead and leverages AVX/SIMD vectorization via ONNX Runtime, achieving a throughput of **> 200 FPS** on commodity CPU hardware.
