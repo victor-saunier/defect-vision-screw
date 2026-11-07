@@ -13,3 +13,6 @@ data/
 # Modèles volumineux
 weights/
 models/
+
+# Graphe de connaissances généré par graphify
+graphify-out/
