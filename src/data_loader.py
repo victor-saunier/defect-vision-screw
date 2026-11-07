@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from PIL import Image
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms
 
 class ScrewDataset(Dataset):
@@ -60,3 +60,22 @@ def get_dataloaders(data_dir: str = "data/screw", batch_size: int = 16):
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, test_loader
+
+
+def get_dataloaders_with_val(data_dir: str = "data/screw", batch_size: int = 16, val_ratio: float = 0.2, seed: int = 0):
+    """
+    Réserve une part des pièces saines de train/good pour calibrer le seuil,
+    afin de ne jamais régler le seuil sur le jeu de test.
+    """
+    train_dataset = ScrewDataset(root_dir=data_dir, split="train")
+    n_val = int(len(train_dataset) * val_ratio)
+    train_subset, val_subset = random_split(
+        train_dataset, [len(train_dataset) - n_val, n_val], generator=torch.Generator().manual_seed(seed)
+    )
+    test_dataset = ScrewDataset(root_dir=data_dir, split="test")
+
+    return (
+        DataLoader(train_subset, batch_size=batch_size, shuffle=False),
+        DataLoader(val_subset, batch_size=batch_size, shuffle=False),
+        DataLoader(test_dataset, batch_size=batch_size, shuffle=False),
+    )

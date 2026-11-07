@@ -7,6 +7,8 @@ from pathlib import Path
 
 from src.anomaly_detector import PatchAnomalyDetector
 
+THRESHOLD_PATH = "models/threshold.json"  # écrit par evaluate.py
+
 @dataclass
 class DefectMetric:
     defect_id: int
@@ -53,6 +55,10 @@ class OpticalInspector:
             raw_map = cv2.resize(raw_map, (224, 224), interpolation=cv2.INTER_LINEAR)
             raw_map = cv2.GaussianBlur(raw_map, (9, 9), sigmaX=4)
             return raw_map
+
+    def score(self, image_tensor: torch.Tensor) -> float:
+        """Score d'anomalie global : maximum de la carte, même grandeur que le seuil."""
+        return float(np.max(self._compute_raw_anomaly_map(image_tensor)))
 
     def inspect(self, image_tensor: torch.Tensor) -> InspectionResult:
         raw_map = self._compute_raw_anomaly_map(image_tensor)

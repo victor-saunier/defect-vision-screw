@@ -1,9 +1,10 @@
+import json
 import matplotlib.pyplot as plt
 from pathlib import Path
 
 from src.data_loader import get_dataloaders
 from src.anomaly_detector import PatchAnomalyDetector
-from src.inspector import OpticalInspector
+from src.inspector import OpticalInspector, THRESHOLD_PATH
 
 def main():
     print("[INFO] Initialisation du système de contrôle qualité...")
@@ -15,7 +16,7 @@ def main():
 
     inspector = OpticalInspector(
         detector=detector,
-        score_threshold=1.70,     # Seuil d'anomalie calibré lors de l'évaluation
+        score_threshold=json.loads(Path(THRESHOLD_PATH).read_text())["score_threshold"],  # calibré par evaluate.py
         min_defect_area_px=50,
         pixel_to_mm_ratio=0.05    # Hypothèse optique : 50 µm / pixel
     )

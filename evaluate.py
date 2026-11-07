@@ -1,10 +1,11 @@
-import sys
+import json
 from pathlib import Path
 import torch
 import numpy as np
 from sklearn.metrics import roc_auc_score, precision_recall_fscore_support, confusion_matrix
 
-from src.data_loader import get_dataloaders
+from src.data_loader import get_dataloaders_with_val
+from src.inspector import OpticalInspector, THRESHOLD_PATH
 from src.anomaly_detector import PatchAnomalyDetector
 
 def evaluate_pipeline():
@@ -12,33 +13,32 @@ def evaluate_pipeline():
     print("   ÉVALUATION DE L'INSPECTION OPTIQUE (MVTec Screw)    ")
     print("=======================================================")
 
-    # 1. Chargement des données
-    train_loader, test_loader = get_dataloaders(batch_size=16)
+    # 1. Chargement des données (20 % des pièces saines réservées au calibrage du seuil)
+    train_loader, val_loader, test_loader = get_dataloaders_with_val(batch_size=16)
 
     # 2. Construction de la mémoire de référence
     detector = PatchAnomalyDetector()
     detector.fit(train_loader, subsample_ratio=0.20)
+    inspector = OpticalInspector(detector=detector)
 
-    # 3. Inférence sur le jeu de test complet
-    print("\n[INFO] Inférence sur les pièces de test (saines et défectueuses)...")
-    y_true = []
-    y_scores = []
+    def score_loader(loader):
+        scores, labels = [], []
+        for images, lbls, _ in loader:
+            scores.extend(inspector.score(img) for img in images)
+            labels.extend(lbls.numpy())
+        return np.array(scores), np.array(labels)
 
-    for images, labels, _ in test_loader:
-        scores = detector.predict_score(images)
-        y_scores.extend(scores)
-        y_true.extend(labels.numpy())
+    # 3. Seuil calibré sur les pièces saines de validation (95e percentile), jamais sur le test
+    print("\n[INFO] Calibrage du seuil sur les pièces saines de validation...")
+    val_scores, _ = score_loader(val_loader)
+    threshold = float(np.percentile(val_scores, 95))
+    Path("models").mkdir(exist_ok=True)
+    Path(THRESHOLD_PATH).write_text(json.dumps({"score_threshold": threshold}))
 
-    y_true = np.array(y_true)
-    y_scores = np.array(y_scores)
-
-    # 4. Calcul de l'AUROC globale
+    # 4. Inférence sur le jeu de test complet
+    print("[INFO] Inférence sur les pièces de test (saines et défectueuses)...")
+    y_scores, y_true = score_loader(test_loader)
     auroc = roc_auc_score(y_true, y_scores)
-
-    # 5. Détermination du seuil de décision optimal (seuil séparateur)
-    # On calibre le seuil au 95e pourcentage des pièces nominales de test
-    nominal_scores = y_scores[y_true == 0]
-    threshold = np.percentile(nominal_scores, 95)
     y_pred = (y_scores >= threshold).astype(int)
 
     # 6. Métriques de classification
