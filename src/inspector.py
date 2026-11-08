@@ -40,24 +40,10 @@ class OpticalInspector:
         self.pixel_to_mm_ratio = pixel_to_mm_ratio * native_size / img_size
 
     def _compute_raw_anomaly_map(self, image_tensor: torch.Tensor) -> np.ndarray:
-        self.detector.extractor.eval()
-        with torch.no_grad():
-            feat1, feat2 = self.detector.extractor(image_tensor.unsqueeze(0))
-            feat2_up = torch.nn.functional.interpolate(
-                feat2, size=feat1.shape[-2:], mode="bilinear", align_corners=False
-            )
-            features = torch.cat([feat1, feat2_up], dim=1)
-
-            _, c, h, w = features.shape
-            patches = features[0].permute(1, 2, 0).reshape(-1, c).numpy()
-
-            distances, _ = self.detector.nn_index.kneighbors(patches)
-            raw_map = distances.reshape(h, w)
-
-            # Redimensionnement direct sans écrasement Min-Max artificiel
-            raw_map = cv2.resize(raw_map, (224, 224), interpolation=cv2.INTER_LINEAR)
-            raw_map = cv2.GaussianBlur(raw_map, (9, 9), sigmaX=4)
-            return raw_map
+        raw_map = self.detector.distance_map(image_tensor)
+        # Redimensionnement direct sans écrasement Min-Max artificiel
+        raw_map = cv2.resize(raw_map, (224, 224), interpolation=cv2.INTER_LINEAR)
+        return cv2.GaussianBlur(raw_map, (9, 9), sigmaX=4)
 
     def score(self, image_tensor: torch.Tensor) -> float:
         """Score d'anomalie global : maximum de la carte, même grandeur que le seuil."""

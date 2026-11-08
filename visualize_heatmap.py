@@ -12,30 +12,15 @@ def generate_anomaly_map(detector: PatchAnomalyDetector, image_tensor: torch.Ten
     """
     Génère une carte thermique bidimensionnelle indiquant la déviation spatiale locale.
     """
-    detector.extractor.eval()
-    with torch.no_grad():
-        feat1, feat2 = detector.extractor(image_tensor.unsqueeze(0))
-        feat2_upsampled = torch.nn.functional.interpolate(
-            feat2, size=feat1.shape[-2:], mode="bilinear", align_corners=False
-        )
-        features = torch.cat([feat1, feat2_upsampled], dim=1)
-        
-        _, c, h, w = features.shape
-        patches = features[0].permute(1, 2, 0).reshape(-1, c).numpy()
-        
-        # Calcul des distances aux patchs sains de référence
-        distances, _ = detector.nn_index.kneighbors(patches)
-        anomaly_map = distances.reshape(h, w)
+    anomaly_map = detector.distance_map(image_tensor)
 
-        # Normalisation min-max locale
-        anomaly_map = (anomaly_map - anomaly_map.min()) / (anomaly_map.max() - anomaly_map.min() + 1e-8)
-        
-        # Redimensionnement vers la résolution de l'image d'entrée
-        anomaly_map = cv2.resize(anomaly_map, (224, 224), interpolation=cv2.INTER_LINEAR)
-        # Lissage gaussien pour adoucir les transitions
-        anomaly_map = cv2.GaussianBlur(anomaly_map, (9, 9), sigmaX=4)
-        
-        return anomaly_map
+    # Normalisation min-max locale
+    anomaly_map = (anomaly_map - anomaly_map.min()) / (anomaly_map.max() - anomaly_map.min() + 1e-8)
+
+    # Redimensionnement vers la résolution de l'image d'entrée
+    anomaly_map = cv2.resize(anomaly_map, (224, 224), interpolation=cv2.INTER_LINEAR)
+    # Lissage gaussien pour adoucir les transitions
+    return cv2.GaussianBlur(anomaly_map, (9, 9), sigmaX=4)
 
 def run_inspection_visualizer():
     print("[INFO] Chargement des données et construction de la référence...")
