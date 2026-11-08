@@ -2,7 +2,8 @@ import os
 from pathlib import Path
 from PIL import Image
 import torch
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset, DataLoader, Subset
+from sklearn.model_selection import KFold
 from torchvision import transforms
 
 class ScrewDataset(Dataset):
@@ -62,20 +63,16 @@ def get_dataloaders(data_dir: str = "data/screw", batch_size: int = 16):
     return train_loader, test_loader
 
 
-def get_dataloaders_with_val(data_dir: str = "data/screw", batch_size: int = 16, val_ratio: float = 0.2, seed: int = 0):
+def get_cv_folds(data_dir: str = "data/screw", batch_size: int = 16, n_splits: int = 5, seed: int = 0):
     """
-    Réserve une part des pièces saines de train/good pour calibrer le seuil,
-    afin de ne jamais régler le seuil sur le jeu de test.
+    Validation croisée sur les pièces saines de train/good : à chaque tour, une banque est
+    construite sur n-1 blocs et le bloc restant sert à calibrer le seuil. On obtient ainsi
+    un score "jamais vu" pour chaque pièce saine, sans toucher au jeu de test.
     """
-    train_dataset = ScrewDataset(root_dir=data_dir, split="train")
-    n_val = int(len(train_dataset) * val_ratio)
-    train_subset, val_subset = random_split(
-        train_dataset, [len(train_dataset) - n_val, n_val], generator=torch.Generator().manual_seed(seed)
-    )
-    test_dataset = ScrewDataset(root_dir=data_dir, split="test")
-
-    return (
-        DataLoader(train_subset, batch_size=batch_size, shuffle=False),
-        DataLoader(val_subset, batch_size=batch_size, shuffle=False),
-        DataLoader(test_dataset, batch_size=batch_size, shuffle=False),
-    )
+    dataset = ScrewDataset(root_dir=data_dir, split="train")
+    kfold = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
+    for train_idx, val_idx in kfold.split(range(len(dataset))):
+        yield (
+            DataLoader(Subset(dataset, train_idx), batch_size=batch_size, shuffle=False),
+            DataLoader(Subset(dataset, val_idx), batch_size=batch_size, shuffle=False),
+        )
