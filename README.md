@@ -44,21 +44,23 @@ Continuous anomaly heatmap generated via intermediate feature space deviation (l
 
 ## Key Performance Results
 
-| Metric | PyTorch Baseline | Feature Aggregation (Optimized) | Target / Requirement |
+| Metric | Baseline (no pooling, 10 % memory bank) | Feature Aggregation (Optimized) | Target / Requirement |
 | :--- | :---: | :---: | :---: |
-| **AUROC (Overall)** | 82.74 % | **92.42 %** | > 90.0 % |
-| **Precision** | 94.83 % | **98.55 %** | Low False Alarm Rate |
-| **Defect Sensitivity (Recall)** | 46.22 % | **57.14 %** | High Defect Capture |
-| **F1-Score** | 62.15 % | **72.34 %** | Balanced Performance |
+| **AUROC (Overall)** | 81.49 % | **92.42 %** | > 90.0 % |
+| **Precision** | 96.00 % | **98.55 %** | Low False Alarm Rate |
+| **Defect Sensitivity (Recall)** | 40.34 % | **57.14 %** | High Defect Capture |
+| **F1-Score** | 56.80 % | **72.34 %** | Balanced Performance |
 
-### Inference Latency Benchmark (Intel/AMD CPU)
+Both columns use the same protocol (decision threshold = 95th percentile of 5-fold cross-validated nominal scores, never tuned on the test set) and the same 160 test images (41 nominal, 119 defective). The only differences are the 3x3 neighborhood pooling and the memory bank size (10 % vs 20 % of the patches). The baseline can be reproduced with `python evaluate.py --baseline`.
 
-Inference speed evaluated over 100 iterations with normalized 224x224x3 frames:
+### Inference Latency Benchmark (Intel Core i9-13900HX, CPU)
+
+Feature-extraction backbone only (ResNet-18 up to layer3), 224x224x3 frames. Median latency over 200 iterations, ranges observed over 4 runs (the laptop CPU frequency varies between runs, the relative gain stays stable):
 
 | Runtime Engine | Latency / Frame | Throughput | Latency Reduction |
 | :--- | :---: | :---: | :---: |
-| **PyTorch Native (CPU)** | 12.32 ms | 81.1 FPS | Baseline |
-| **ONNX Runtime (CPU)** | **4.56 ms** | **219.3 FPS** | **-63.0 %** |
+| **PyTorch Native (CPU)** | 9.3 – 15.3 ms | 65 – 108 FPS | Baseline |
+| **ONNX Runtime (CPU)** | **3.5 – 5.1 ms** | **196 – 284 FPS** | **-62 to -70 %** |
 
 
 
@@ -236,6 +238,8 @@ python setup_data.py
 
 python evaluate.py
 
+python evaluate.py --baseline   # optional: initial version, for comparison
+
 ```
 
 
@@ -282,4 +286,4 @@ python benchmark_latency.py
 
 * **Calibrated Physical Metrology:** Converts segmented pixel clusters into physical surface measurements (mm²) using an optical calibration factor (50 µm / pixel), with the threshold calibrated (95th percentile) with 5-fold cross-validation on the 320 nominal training parts, never on the test set, and areas rescaled to the native 1024 px resolution.
 
-* **Edge-Optimized Runtime:** Eliminates autograd overhead and leverages AVX/SIMD vectorization via ONNX Runtime, achieving a throughput of **> 200 FPS** on commodity CPU hardware.
+* **Edge-Optimized Runtime:** Eliminates autograd overhead and leverages AVX/SIMD vectorization via ONNX Runtime, achieving a backbone throughput of roughly **200 – 280 FPS** on a laptop CPU (the k-NN search is not included in this measure).
