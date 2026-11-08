@@ -4,7 +4,7 @@ import torch
 import onnxruntime as ort
 from src.feature_extractor import FeatureExtractor
 
-def benchmark_inference(num_warmup: int = 20, num_iterations: int = 100):
+def benchmark_inference(num_warmup: int = 20, num_iterations: int = 200):
     print("=======================================================")
     print("      BENCHMARK DE LATENCE INDUSTRIELLE (CPU)")
     print("=======================================================")
@@ -26,14 +26,13 @@ def benchmark_inference(num_warmup: int = 20, num_iterations: int = 100):
             _ = pytorch_model(dummy_tensor)
 
     # Mesure temporelle
-    start_pt = time.perf_counter()
+    pt_times = []
     with torch.no_grad():
         for _ in range(num_iterations):
+            t0 = time.perf_counter()
             _ = pytorch_model(dummy_tensor)
-    end_pt = time.perf_counter()
-
-    pt_total_time = (end_pt - start_pt) * 1000.0  # en ms
-    pt_latency = pt_total_time / num_iterations
+            pt_times.append((time.perf_counter() - t0) * 1000.0)  # en ms
+    pt_latency = float(np.median(pt_times))  # médiane : insensible aux pics de charge du système
     pt_fps = 1000.0 / pt_latency
 
     # ---------------------------------------------------------
@@ -51,13 +50,12 @@ def benchmark_inference(num_warmup: int = 20, num_iterations: int = 100):
         _ = session.run(None, {input_name: dummy_np})
 
     # Mesure temporelle
-    start_ort = time.perf_counter()
+    ort_times = []
     for _ in range(num_iterations):
+        t0 = time.perf_counter()
         _ = session.run(None, {input_name: dummy_np})
-    end_ort = time.perf_counter()
-
-    ort_total_time = (end_ort - start_ort) * 1000.0
-    ort_latency = ort_total_time / num_iterations
+        ort_times.append((time.perf_counter() - t0) * 1000.0)
+    ort_latency = float(np.median(ort_times))
     ort_fps = 1000.0 / ort_latency
 
     speedup = ((pt_latency - ort_latency) / pt_latency) * 100.0
