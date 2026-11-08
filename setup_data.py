@@ -1,4 +1,3 @@
-import os
 import shutil
 from pathlib import Path
 from datasets import load_dataset

@@ -1,9 +1,7 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
-from pathlib import Path
 
 from src.feature_extractor import FeatureExtractor
 from src.data_loader import get_dataloaders

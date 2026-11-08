@@ -1,4 +1,3 @@
-import os
 import cv2
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -38,10 +37,10 @@ def inspect_dataset_samples():
     
     # Affichage des propriétés d'une trame brute
     h, w, c = load_rgb(good_sample).shape
-    print(f"\n[PROPRIÉTÉS MATRICIELLES]")
+    print("\n[PROPRIÉTÉS MATRICIELLES]")
     print(f"• Résolution native : {w}x{h} pixels")
     print(f"• Canaux couleur    : {c} (RGB)")
-    print(f"• Type de données   : uint8 [0, 255]")
+    print("• Type de données   : uint8 [0, 255]")
 
     plt.show()
 

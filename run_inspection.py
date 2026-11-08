@@ -7,6 +7,8 @@ from src.anomaly_detector import PatchAnomalyDetector
 from src.inspector import OpticalInspector, THRESHOLD_PATH
 
 def main():
+    if not Path(THRESHOLD_PATH).exists():
+        raise SystemExit(f"{THRESHOLD_PATH} introuvable : lancez d'abord 'python evaluate.py' pour calibrer le seuil.")
     print("[INFO] Initialisation du système de contrôle qualité...")
     train_loader, test_loader = get_dataloaders(batch_size=16)
 

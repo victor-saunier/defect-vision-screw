@@ -3,7 +3,6 @@ import numpy as np
 import torch
 from dataclasses import dataclass
 from typing import List, Tuple
-from pathlib import Path
 
 from src.anomaly_detector import PatchAnomalyDetector
 

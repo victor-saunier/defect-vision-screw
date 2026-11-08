@@ -1,7 +1,5 @@
-import os
 from pathlib import Path
 from PIL import Image
-import torch
 from torch.utils.data import Dataset, DataLoader, Subset
 from sklearn.model_selection import KFold
 from torchvision import transforms

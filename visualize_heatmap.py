@@ -1,4 +1,3 @@
-import sys
 from pathlib import Path
 import cv2
 import torch
@@ -30,11 +29,11 @@ def run_inspection_visualizer():
     detector.fit(train_loader, subsample_ratio=0.20)
 
     # Récupération d'un échantillon défectueux dans le test loader
-    target_img, target_label, target_path = None, None, None
+    target_img, target_path = None, None
     for images, labels, paths in test_loader:
         for img, lbl, p in zip(images, labels, paths):
             if lbl.item() == 1 and ("thread_side" in p or "scratch_head" in p):
-                target_img, target_label, target_path = img, lbl, p
+                target_img, target_path = img, p
                 break
         if target_img is not None:
             break
