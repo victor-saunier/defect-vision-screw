@@ -111,7 +111,7 @@ class OpticalInspector:
             for d in defects:
                 x, y, w, h = d.bbox
                 cv2.rectangle(annotated, (x, y), (x + w, y + h), (0, 0, 255), 2)
-                cv2.putText(annotated, f"#{d.defect_id}: {d.area_mm2:.2f}mm2", (x, max(15, y - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 1, cv2.LINE_AA)
+                cv2.putText(annotated, f"#{d.defect_id}: {d.area_mm2:.2f}mm2", (x, y - 5 if y > 60 else y + h + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 1, cv2.LINE_AA)
 
         return InspectionResult(
             decision=decision,
