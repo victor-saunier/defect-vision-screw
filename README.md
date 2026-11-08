@@ -126,6 +126,8 @@ Input Frame (224x224x3)
 
 defect-vision-screw/
 
+├── .github/workflows/ci.yml  # CI: runs the unit tests on every push and pull request
+
 ├── assets/                   # Visual inspection results and screenshots
 
 │   ├── heatmap_localization.png
@@ -138,11 +140,11 @@ defect-vision-screw/
 
 ├── models/
 
-│   └── backbone.onnx         # Optimized static ONNX computational graph
+│   ├── backbone.onnx         # Optimized static ONNX computational graph (backbone only)
+
+│   └── threshold.json        # Decision threshold written by evaluate.py (not versioned)
 
 ├── src/
-
-│   ├── __init__.py
 
 │   ├── data_loader.py        # PyTorch Dataset and DataLoader with ImageNet transforms
 
@@ -151,6 +153,14 @@ defect-vision-screw/
 │   ├── anomaly_detector.py   # Multi-scale patch alignment and k-NN memory bank
 
 │   └── inspector.py          # Metrology module, OpenCV bounding boxes, and Pass/Fail gating
+
+├── tests/                    # Unit tests (pytest) on synthetic data, no dataset needed
+
+│   ├── test_data_loader.py   # Label parsing and 5-fold split (disjoint, full coverage)
+
+│   ├── test_detector.py      # Feature fusion shapes (128 + 256 -> 384 channels)
+
+│   └── test_inspector.py     # PASS/FAIL decision and pixel -> mm² conversion
 
 ├── setup_data.py             # Automated dataset ingestion from public mirrors
 
@@ -164,7 +174,13 @@ defect-vision-screw/
 
 ├── export_onnx.py            # Static ONNX graph export (Opset 18)
 
-└── benchmark_latency.py      # Profiling script comparing PyTorch CPU vs ONNX Runtime
+├── benchmark_latency.py      # Profiling script comparing PyTorch CPU vs ONNX Runtime
+
+├── requirements.txt          # Pinned runtime dependencies
+
+├── requirements-dev.txt      # Runtime dependencies + pytest
+
+└── pytest.ini                # pytest configuration
 
 ```
 
@@ -180,6 +196,8 @@ defect-vision-screw/
 
 ### 1. Environment Setup
 
+Tested with Python 3.13. To also run the unit tests, install `requirements-dev.txt` instead and run `pytest`.
+
 
 
 ```powershell
@@ -192,7 +210,7 @@ python -m venv venv
 
 .\venv\Scripts\Activate.ps1
 
-pip install torch torchvision opencv-python matplotlib scikit-learn datasets onnx onnxruntime onnxscript
+pip install -r requirements.txt
 
 ```
 
@@ -223,6 +241,8 @@ python evaluate.py
 
 
 ### 4. Industrial Metrology & Inspection
+
+Requires step 3 first: `evaluate.py` calibrates the decision threshold and saves it to `models/threshold.json`.
 
 
 
