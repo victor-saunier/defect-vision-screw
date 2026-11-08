@@ -7,7 +7,7 @@ class FeatureExtractor(nn.Module):
     Extracteur de descripteurs visuels multi-échelles avec agrégation locale (PatchCore-like).
     Intègre un lissage par voisinage pour immuniser la détection contre le bruit optique.
     """
-    def __init__(self):
+    def __init__(self, pool: bool = True):
         super().__init__()
         weights = ResNet18_Weights.DEFAULT
         resnet = resnet18(weights=weights)
@@ -23,7 +23,7 @@ class FeatureExtractor(nn.Module):
         self.layer3 = resnet.layer3
 
         # Lissage par moyenne locale : capture le contexte spatial immédiat du défaut
-        self.avg_pool = nn.AvgPool2d(kernel_size=3, stride=1, padding=1)
+        self.avg_pool = nn.AvgPool2d(kernel_size=3, stride=1, padding=1) if pool else nn.Identity()
 
         self.eval()
         for param in self.parameters():

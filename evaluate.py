@@ -1,3 +1,4 @@
+import argparse
 import json
 from pathlib import Path
 import numpy as np
@@ -7,7 +8,10 @@ from src.data_loader import get_dataloaders, get_cv_folds
 from src.inspector import OpticalInspector, THRESHOLD_PATH
 from src.anomaly_detector import PatchAnomalyDetector
 
-def evaluate_pipeline():
+def evaluate_pipeline(baseline: bool = False):
+    # Baseline = version initiale du projet : sans lissage local et avec 10 % des patchs en mémoire
+    pool, ratio = (False, 0.10) if baseline else (True, 0.20)
+
     print("=======================================================")
     print("   ÉVALUATION DE L'INSPECTION OPTIQUE (MVTec Screw)    ")
     print("=======================================================")
@@ -17,20 +21,21 @@ def evaluate_pipeline():
     val_scores = []
     for fold, (fold_train, fold_val) in enumerate(get_cv_folds(), start=1):
         print(f"\n[INFO] Validation croisée : bloc {fold}/5")
-        fold_detector = PatchAnomalyDetector()
-        fold_detector.fit(fold_train, subsample_ratio=0.20)
+        fold_detector = PatchAnomalyDetector(pool=pool)
+        fold_detector.fit(fold_train, subsample_ratio=ratio)
         fold_inspector = OpticalInspector(detector=fold_detector)
         for images, _, _ in fold_val:
             val_scores.extend(fold_inspector.score(img) for img in images)
     threshold = float(np.percentile(val_scores, 95))
     print(f"\n[INFO] Seuil calibré sur {len(val_scores)} pièces saines : {threshold:.4f}")
-    Path("models").mkdir(exist_ok=True)
-    Path(THRESHOLD_PATH).write_text(json.dumps({"score_threshold": threshold}))
+    if not baseline:  # la baseline ne doit pas écraser le seuil utilisé par run_inspection.py
+        Path("models").mkdir(exist_ok=True)
+        Path(THRESHOLD_PATH).write_text(json.dumps({"score_threshold": threshold}))
 
     # 2. Modèle final : banque de référence sur toutes les pièces saines
     train_loader, test_loader = get_dataloaders(batch_size=16)
-    detector = PatchAnomalyDetector()
-    detector.fit(train_loader, subsample_ratio=0.20)
+    detector = PatchAnomalyDetector(pool=pool)
+    detector.fit(train_loader, subsample_ratio=ratio)
     inspector = OpticalInspector(detector=detector)
 
     # 3. Inférence sur le jeu de test complet
@@ -62,4 +67,6 @@ def evaluate_pipeline():
     print("==========================================================")
 
 if __name__ == "__main__":
-    evaluate_pipeline()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--baseline", action="store_true", help="évalue la version initiale (sans lissage, 10 %% des patchs)")
+    evaluate_pipeline(baseline=parser.parse_args().baseline)

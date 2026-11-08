@@ -11,8 +11,8 @@ class PatchAnomalyDetector:
     Détecteur d'anomalies basé sur l'extraction de patchs multi-échelles
     et la comparaison par plus proches voisins (k-NN).
     """
-    def __init__(self, n_neighbors: int = 1):
-        self.extractor = FeatureExtractor()
+    def __init__(self, n_neighbors: int = 1, pool: bool = True):
+        self.extractor = FeatureExtractor(pool=pool)
         self.n_neighbors = n_neighbors
         self.memory_bank = None
         self.nn_index = NearestNeighbors(n_neighbors=n_neighbors, algorithm="auto", metric="euclidean")
