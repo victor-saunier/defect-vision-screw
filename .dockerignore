@@ -1,0 +1,15 @@
+# Ce qui ne doit pas être copié dans l'image Docker
+.git
+.github
+venv/
+.env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Dataset et modèles : montés au lancement, jamais copiés dans l'image
+data/
+models/
+
+# Sortie de graphify
+graphify-out/
