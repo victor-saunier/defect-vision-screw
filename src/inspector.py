@@ -47,12 +47,11 @@ class OpticalInspector:
     def _compute_raw_anomaly_map(self, image_tensor: torch.Tensor) -> np.ndarray:
         return self._smooth(self.detector.distance_map(image_tensor))
 
-    def score(self, image_tensor: torch.Tensor) -> float:
-        """Score d'anomalie global : maximum de la carte, même grandeur que le seuil."""
-        return float(np.max(self._compute_raw_anomaly_map(image_tensor)))
-
     def score_patches(self, patches: torch.Tensor) -> float:
-        """Même score à partir des descripteurs [784, 384] déjà extraits (évite de relancer le backbone)."""
+        """
+        Score d'anomalie global (maximum de la carte, même grandeur que le seuil) à partir des
+        descripteurs [784, 384] d'une image déjà extraits par le détecteur.
+        """
         return float(np.max(self._smooth(self.detector.distance_map_from_patches(patches))))
 
     def inspect(self, image_tensor: torch.Tensor) -> InspectionResult:

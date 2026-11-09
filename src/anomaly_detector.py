@@ -80,13 +80,6 @@ class PatchAnomalyDetector:
         """Carte de distances [28, 28] pour une image [3, 224, 224]."""
         return self.distance_map_from_patches(self._describe(image_tensor.unsqueeze(0))[0])
 
-    def predict_score(self, images: torch.Tensor) -> np.ndarray:
-        """
-        Score d'anomalie global pour chaque image d'un batch :
-        la déviation maximale observée sur la pièce.
-        """
-        return np.array([self.distance_map(img).max() for img in images])
-
 if __name__ == "__main__":
     train_loader, _ = get_dataloaders(batch_size=32)
     detector = PatchAnomalyDetector()

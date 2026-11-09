@@ -12,6 +12,9 @@ class FakeDetector:
     def distance_map(self, image_tensor):
         return self._map
 
+    def distance_map_from_patches(self, patches):
+        return self._map
+
 
 def make_map(defect: bool) -> np.ndarray:
     m = np.full((28, 28), 0.5, dtype=np.float32)
@@ -41,4 +44,4 @@ def test_defective_part_fails_with_area_in_mm2():
 
 def test_score_is_max_of_map():
     inspector = OpticalInspector(FakeDetector(make_map(defect=True)))
-    assert 4.0 < inspector.score(torch.zeros(3, 224, 224)) <= 5.0
+    assert 4.0 < inspector.score_patches(torch.zeros(784, 384)) <= 5.0
