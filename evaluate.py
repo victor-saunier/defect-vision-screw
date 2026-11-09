@@ -44,7 +44,60 @@ def report_operating_points(y_true, y_scores, val_scores, save_plot):
         plt.savefig("assets/roc_curve.png", dpi=100)
         plt.close()
 
-def evaluate_pipeline(baseline: bool = False, percentile: float = 95):
+def run_seed(detector, inspector, train_patches, test_patches, y_true, ratio, percentile, seed):
+    """
+    Une évaluation complète pour une graine : seuil par validation croisée sur les pièces saines,
+    banque finale, puis mesure sur le jeu de test. La graine contrôle le découpage en 5 blocs
+    et le tirage aléatoire des patchs de la banque.
+    """
+    # Seuil par validation croisée (5 blocs) sur les pièces saines de train/good :
+    # chaque pièce est scorée par une banque qui ne l'a jamais vue, le test n'est pas utilisé
+    val_scores = []
+    for fold, (train_idx, val_idx) in enumerate(get_cv_folds(len(train_patches), seed=seed), start=1):
+        print(f"\n[INFO] Graine {seed} : validation croisée, bloc {fold}/5")
+        detector.fit_patches(train_patches[train_idx], subsample_ratio=ratio, seed=seed)
+        val_scores.extend(inspector.score_patches(p) for p in train_patches[val_idx])
+    threshold = float(np.percentile(val_scores, percentile))
+
+    # Modèle final : banque de référence sur toutes les pièces saines, mesure sur le jeu de test complet
+    print(f"\n[INFO] Graine {seed} : modèle final et inférence sur les pièces de test...")
+    detector.fit_patches(train_patches, subsample_ratio=ratio, seed=seed)
+    y_scores = np.array([inspector.score_patches(p) for p in test_patches])
+    y_pred = (y_scores >= threshold).astype(int)
+
+    precision, recall, f1, _ = precision_recall_fscore_support(y_true, y_pred, average="binary")
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    return {
+        "threshold": threshold, "val_scores": np.array(val_scores), "y_scores": y_scores,
+        "auroc": roc_auc_score(y_true, y_scores), "precision": precision, "recall": recall, "f1": f1,
+        "tn": tn, "fp": fp, "fn": fn, "tp": tp,
+    }
+
+def print_report(res, percentile):
+    print(f"\n[INFO] Seuil calibré sur {len(res['val_scores'])} pièces saines (percentile {percentile:g}) : {res['threshold']:.4f}")
+    print("\n================== RÉSULTATS D'INSPECTION ================")
+    print(f"• AUROC Globale               : {res['auroc'] * 100:.2f} %")
+    print(f"• F1-Score                    : {res['f1'] * 100:.2f} %")
+    print(f"• Sensibilité (Recall Défauts): {res['recall'] * 100:.2f} %")
+    print(f"• Précision                   : {res['precision'] * 100:.2f} %")
+    print(f"• Seuil calibré               : {res['threshold']:.4f}")
+    print("----------------------------------------------------------")
+    print(f"• Vrais Négatifs (Sains OK)   : {res['tn']} / {res['tn'] + res['fp']}")
+    print(f"• Vrais Positifs (Défauts OK) : {res['tp']} / {res['tp'] + res['fn']}")
+    print(f"• Faux Positifs (Fausse alerte: {res['fp']}")
+    print(f"• Faux Négatifs (Défauts omis): {res['fn']}")
+    print("==========================================================")
+
+def print_summary(results):
+    print(f"\n=========== RÉSUMÉ SUR {len(results)} GRAINES (moyenne ± écart-type, min – max) ===========")
+    for key, label in (("auroc", "AUROC"), ("precision", "Précision"), ("recall", "Rappel"), ("f1", "F1-Score")):
+        v = np.array([r[key] for r in results]) * 100
+        print(f"• {label:<10}: {v.mean():.2f} ± {v.std(ddof=1):.2f} %   ({v.min():.2f} – {v.max():.2f})")
+    t = np.array([r["threshold"] for r in results])
+    print(f"• {'Seuil':<10}: {t.mean():.3f} ± {t.std(ddof=1):.3f}   ({t.min():.3f} – {t.max():.3f})")
+    print("==========================================================")
+
+def evaluate_pipeline(baseline: bool = False, percentile: float = 95, n_seeds: int = 1):
     # Baseline = version initiale du projet : sans lissage local et avec 10 % des patchs en mémoire
     pool, ratio = (False, 0.10) if baseline else (True, 0.20)
 
@@ -52,8 +105,8 @@ def evaluate_pipeline(baseline: bool = False, percentile: float = 95):
     print("   ÉVALUATION DE L'INSPECTION OPTIQUE (MVTec Screw)    ")
     print("=======================================================")
 
-    # 0. Descripteurs de toutes les images calculés une seule fois : le backbone est gelé, le résultat
-    #    est identique à chaque fois, on le réutilise pour chaque banque de la validation croisée
+    # Descripteurs de toutes les images calculés une seule fois : le backbone est gelé, le résultat
+    # est identique à chaque fois, on le réutilise pour chaque banque et chaque graine
     train_loader, test_loader = get_dataloaders(batch_size=16)
     detector = PatchAnomalyDetector(pool=pool)
     inspector = OpticalInspector(detector=detector)
@@ -62,51 +115,24 @@ def evaluate_pipeline(baseline: bool = False, percentile: float = 95):
     test_patches = detector.extract_patches(test_loader)
     y_true = np.array(test_loader.dataset.labels)
 
-    # 1. Seuil par validation croisée (5 blocs) sur les pièces saines de train/good :
-    #    chaque pièce est scorée par une banque qui ne l'a jamais vue, le test n'est pas utilisé
-    val_scores = []
-    for fold, (train_idx, val_idx) in enumerate(get_cv_folds(len(train_patches)), start=1):
-        print(f"\n[INFO] Validation croisée : bloc {fold}/5")
-        detector.fit_patches(train_patches[train_idx], subsample_ratio=ratio)
-        val_scores.extend(inspector.score_patches(p) for p in train_patches[val_idx])
-    threshold = float(np.percentile(val_scores, percentile))
-    print(f"\n[INFO] Seuil calibré sur {len(val_scores)} pièces saines (percentile {percentile:g}) : {threshold:.4f}")
+    results = [run_seed(detector, inspector, train_patches, test_patches, y_true, ratio, percentile, seed)
+               for seed in range(n_seeds)]
+
+    # Rapport détaillé, seuil et courbe : ceux de la graine 0
+    first = results[0]
+    print_report(first, percentile)
     if not baseline:  # la baseline ne doit pas écraser le seuil utilisé par run_inspection.py
         Path("models").mkdir(exist_ok=True)
-        Path(THRESHOLD_PATH).write_text(json.dumps({"score_threshold": threshold}))
+        Path(THRESHOLD_PATH).write_text(json.dumps({"score_threshold": first["threshold"]}))
+    report_operating_points(y_true, first["y_scores"], first["val_scores"], save_plot=not baseline)
 
-    # 2. Modèle final : banque de référence sur toutes les pièces saines
-    detector.fit_patches(train_patches, subsample_ratio=ratio)
-
-    # 3. Inférence sur le jeu de test complet
-    print("\n[INFO] Inférence sur les pièces de test (saines et défectueuses)...")
-    y_scores = np.array([inspector.score_patches(p) for p in test_patches])
-    auroc = roc_auc_score(y_true, y_scores)
-    y_pred = (y_scores >= threshold).astype(int)
-
-    # 6. Métriques de classification
-    precision, recall, f1, _ = precision_recall_fscore_support(y_true, y_pred, average="binary")
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-
-    # 7. Rapport d'inspection
-    print("\n================== RÉSULTATS D'INSPECTION ================")
-    print(f"• AUROC Globale               : {auroc * 100:.2f} %")
-    print(f"• F1-Score                    : {f1 * 100:.2f} %")
-    print(f"• Sensibilité (Recall Défauts): {recall * 100:.2f} %")
-    print(f"• Précision                   : {precision * 100:.2f} %")
-    print(f"• Seuil calibré               : {threshold:.4f}")
-    print("----------------------------------------------------------")
-    print(f"• Vrais Négatifs (Sains OK)   : {tn} / {tn + fp}")
-    print(f"• Vrais Positifs (Défauts OK) : {tp} / {tp + fn}")
-    print(f"• Faux Positifs (Fausse alerte: {fp}")
-    print(f"• Faux Négatifs (Défauts omis): {fn}")
-    print("==========================================================")
-
-    report_operating_points(y_true, y_scores, np.array(val_scores), save_plot=not baseline)
+    if n_seeds > 1:
+        print_summary(results)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--baseline", action="store_true", help="évalue la version initiale (sans lissage, 10 %% des patchs)")
     parser.add_argument("--percentile", type=float, default=95, help="percentile des scores sains retenu comme seuil (plus bas = plus de défauts détectés, plus de fausses alertes)")
+    parser.add_argument("--seeds", type=int, default=1, help="nombre de graines aléatoires (0 à N-1) : affiche la moyenne et l'écart-type")
     args = parser.parse_args()
-    evaluate_pipeline(baseline=args.baseline, percentile=args.percentile)
+    evaluate_pipeline(baseline=args.baseline, percentile=args.percentile, n_seeds=args.seeds)
