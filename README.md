@@ -152,7 +152,7 @@ Input Frame (224x224x3)
 
 defect-vision-screw/
 
-├── .github/workflows/ci.yml  # CI: runs the unit tests on every push and pull request
+├── .github/workflows/ci.yml  # CI: runs the unit tests and builds the Docker image on every push and pull request
 
 ├── assets/                   # Visual inspection results and screenshots
 
@@ -203,6 +203,10 @@ defect-vision-screw/
 ├── export_onnx.py            # Static ONNX graph export (Opset 18)
 
 ├── benchmark_latency.py      # Profiling script comparing PyTorch CPU vs ONNX Runtime
+
+├── Dockerfile                # CPU image: Python 3.13 and the pinned dependencies
+
+├── .dockerignore             # Keeps the dataset, models and Git history out of the image
 
 ├── requirements.txt          # Pinned runtime dependencies
 
@@ -299,6 +303,25 @@ python export_onnx.py
 python benchmark_latency.py
 
 ```
+
+### 6. Docker (Optional)
+
+An image with Python 3.13 and all the dependencies (CPU-only PyTorch) can be built and run without installing anything else, using [Docker Desktop](https://www.docker.com/products/docker-desktop/):
+
+```powershell
+
+docker build -t defect-vision .
+
+docker run --rm -v ${PWD}/data:/app/data defect-vision
+
+```
+
+* The first command builds the image (about 3 minutes and about 3 GB on disk, mostly PyTorch). Docker stores it on your machine: it is not part of the repository.
+* The second command runs `evaluate.py`. The dataset is never copied into the image: it is mounted from `data/` (run `python setup_data.py` first). On the same data, the container gives exactly the same results as the native run (seed 0: threshold 1.6423, AUROC 93.48 %).
+* Other scripts can be run the same way; to keep the generated model on your machine, mount `models/` too: `docker run --rm -v ${PWD}/models:/app/models defect-vision sh -c "python export_onnx.py && python benchmark_latency.py"`. The pretrained ResNet-18 weights are downloaded at the start of each run (the image does not include them), so an Internet connection is required.
+* Scripts that open a matplotlib window (`explore_data.py`, `run_inspection.py`, `visualize_heatmap.py`) are not meant for the container, which has no display.
+* The latency benchmark is slower inside the container (one run: PyTorch 13.6 ms, ONNX Runtime 5.6 ms, still about -59 %); the table above was measured natively.
+* The CI builds this image on every push and checks that the main libraries import correctly.
 
 
 
