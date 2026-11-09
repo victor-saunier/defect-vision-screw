@@ -21,3 +21,14 @@ jobs:
 
       - name: Run unit tests
         run: pytest
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t defect-vision .
+
+      - name: Smoke test (the main libraries import inside the image)
+        run: docker run --rm defect-vision python -c "import torch, cv2, onnxruntime, sklearn; print('imports OK')"
