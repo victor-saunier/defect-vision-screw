@@ -46,12 +46,14 @@ Continuous anomaly heatmap generated via intermediate feature space deviation (l
 
 | Metric | Baseline (no pooling, 10 % memory bank) | Feature Aggregation (Optimized) | Target / Requirement |
 | :--- | :---: | :---: | :---: |
-| **AUROC (Overall)** | 83.09 % | **93.48 %** | > 90.0 % |
-| **Precision** | 96.43 % | **98.59 %** | Low False Alarm Rate |
-| **Defect Sensitivity (Recall)** | 45.38 % | **58.82 %** | High Defect Capture |
-| **F1-Score** | 61.71 % | **73.68 %** | Balanced Performance |
+| **AUROC (Overall)** | 84.32 ± 1.04 % | **93.06 ± 0.99 %** | > 90.0 % |
+| **Precision** | 97.82 ± 2.32 % | **98.66 ± 0.92 %** | Low False Alarm Rate |
+| **Defect Sensitivity (Recall)** | 41.18 ± 7.68 % | **60.84 ± 1.93 %** | High Defect Capture |
+| **F1-Score** | 57.55 ± 8.06 % | **75.25 ± 1.30 %** | Balanced Performance |
 
-Both columns use the same protocol (decision threshold = 95th percentile of 5-fold cross-validated nominal scores, never tuned on the test set) and the same 160 test images (41 nominal, 119 defective). The only differences are the 3x3 neighborhood pooling and the memory bank size (10 % vs 20 % of the patches). The baseline can be reproduced with `python evaluate.py --baseline`.
+Values are the mean ± standard deviation over 5 random seeds (0 to 4), which change the 5-fold split and the random draw of the memory-bank patches.
+
+Both columns use the same protocol (decision threshold = 95th percentile of 5-fold cross-validated nominal scores, never tuned on the test set) and the same 160 test images (41 nominal, 119 defective). The only differences are the 3x3 neighborhood pooling and the memory bank size (10 % vs 20 % of the patches). The AUROC gain (about 9 points) is roughly nine times the seed-to-seed standard deviation, whereas the precision difference is within that spread and should not be read as an improvement. The baseline recall is unstable (27.7 % to 46.2 % depending on the seed). Reproduce with `python evaluate.py --seeds 5` and `python evaluate.py --baseline --seeds 5` (about 7 and 3 minutes). The operating-point table and the ROC curve below come from seed 0 only.
 
 ### Choosing the Operating Point (Detection vs. False Alarms)
 
@@ -66,7 +68,7 @@ The decision threshold is a business choice: a lower threshold catches more defe
 
 ![ROC Curve with Operating Points](assets/roc_curve.png)
 
-* The ROC curve plots recall against the share of good parts rejected; the area under it is the AUROC (93.5 %). The red points are the four thresholds above.
+* The ROC curve plots recall against the share of good parts rejected; the area under it is the AUROC (93.5 % for seed 0). The red points are the four thresholds above.
 * Only 41 nominal test images exist, so each rate is coarse (one image = 2.4 points) and the curve is stepped.
 * The test set contains 74 % defective parts, which inflates the precision column (see Limitations).
 * The threshold used by `run_inspection.py` can be changed with `python evaluate.py --percentile 90`.
@@ -262,6 +264,8 @@ python evaluate.py
 
 python evaluate.py --baseline   # optional: initial version, for comparison
 
+python evaluate.py --seeds 5   # optional: mean and standard deviation over 5 random seeds (about 7 minutes)
+
 python evaluate.py --percentile 90   # optional: lower threshold, more defects caught, more false alarms
 
 ```
@@ -319,12 +323,12 @@ python benchmark_latency.py
 This is a prototype evaluated on a public benchmark, not a validated production system. The points below explain what the results do and do not show.
 
 **1. Small test set: the rates are rough orders of magnitude.**
-* The test set has 160 images (119 defective, only 41 nominal) and every result comes from a single random seed.
-* The random draw of the memory-bank patches matters: an earlier run with a different draw gave an AUROC of 92.4 % instead of 93.5 % (baseline: 81.5 % instead of 83.1 %). Differences of 1 to 2 points are within this noise.
+* The test set has 160 images (119 defective, only 41 nominal) and the confidence intervals below are computed on the seed-0 results.
+* The 5 random seeds quantify the randomness of the algorithm (about 1 point of AUROC for both versions). They do not capture the uncertainty due to the small test set, which is the subject of this point.
 * Example: 1 good part rejected out of 41 is a 2.4 % false-alarm rate, but the 95 % confidence interval is 0.06 % to 12.9 %. The recall of 58.8 % (70 / 119) has an interval of 49.4 % to 67.8 %.
 * These are exact binomial (Clopper-Pearson) intervals: the range of true rates for which the observed result would not be rarer than 2.5 % on either side. They are not computed by the project code; to reproduce them: `scipy.stats.binomtest(1, 41).proportion_ci(method="exact")`.
 * With 41 nominal images, rates move in steps of 2.4 points: the P95 and P90 rows (2.4 % vs 4.9 %) differ by a single image.
-* To reduce this: more nominal test images and several random seeds.
+* To reduce this: more nominal test images.
 
 **2. Real production has far fewer defects than the test set.**
 * The test set is 74 % defective, which inflates precision. In production defects are rare: a fastener supplier quotes about 200 PPM (0.02 %) as an accepted level in high-volume production (vendor figure, indicative only).
