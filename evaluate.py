@@ -52,16 +52,23 @@ def evaluate_pipeline(baseline: bool = False, percentile: float = 95):
     print("   ÉVALUATION DE L'INSPECTION OPTIQUE (MVTec Screw)    ")
     print("=======================================================")
 
+    # 0. Descripteurs de toutes les images calculés une seule fois : le backbone est gelé, le résultat
+    #    est identique à chaque fois, on le réutilise pour chaque banque de la validation croisée
+    train_loader, test_loader = get_dataloaders(batch_size=16)
+    detector = PatchAnomalyDetector(pool=pool)
+    inspector = OpticalInspector(detector=detector)
+    print("[INFO] Extraction des descripteurs (train et test)...")
+    train_patches = detector.extract_patches(train_loader)
+    test_patches = detector.extract_patches(test_loader)
+    y_true = np.array(test_loader.dataset.labels)
+
     # 1. Seuil par validation croisée (5 blocs) sur les pièces saines de train/good :
     #    chaque pièce est scorée par une banque qui ne l'a jamais vue, le test n'est pas utilisé
     val_scores = []
-    for fold, (fold_train, fold_val) in enumerate(get_cv_folds(), start=1):
+    for fold, (train_idx, val_idx) in enumerate(get_cv_folds(len(train_patches)), start=1):
         print(f"\n[INFO] Validation croisée : bloc {fold}/5")
-        fold_detector = PatchAnomalyDetector(pool=pool)
-        fold_detector.fit(fold_train, subsample_ratio=ratio)
-        fold_inspector = OpticalInspector(detector=fold_detector)
-        for images, _, _ in fold_val:
-            val_scores.extend(fold_inspector.score(img) for img in images)
+        detector.fit_patches(train_patches[train_idx], subsample_ratio=ratio)
+        val_scores.extend(inspector.score_patches(p) for p in train_patches[val_idx])
     threshold = float(np.percentile(val_scores, percentile))
     print(f"\n[INFO] Seuil calibré sur {len(val_scores)} pièces saines (percentile {percentile:g}) : {threshold:.4f}")
     if not baseline:  # la baseline ne doit pas écraser le seuil utilisé par run_inspection.py
@@ -69,18 +76,11 @@ def evaluate_pipeline(baseline: bool = False, percentile: float = 95):
         Path(THRESHOLD_PATH).write_text(json.dumps({"score_threshold": threshold}))
 
     # 2. Modèle final : banque de référence sur toutes les pièces saines
-    train_loader, test_loader = get_dataloaders(batch_size=16)
-    detector = PatchAnomalyDetector(pool=pool)
-    detector.fit(train_loader, subsample_ratio=ratio)
-    inspector = OpticalInspector(detector=detector)
+    detector.fit_patches(train_patches, subsample_ratio=ratio)
 
     # 3. Inférence sur le jeu de test complet
     print("\n[INFO] Inférence sur les pièces de test (saines et défectueuses)...")
-    y_true, y_scores = [], []
-    for images, labels, _ in test_loader:
-        y_scores.extend(inspector.score(img) for img in images)
-        y_true.extend(labels.numpy())
-    y_true, y_scores = np.array(y_true), np.array(y_scores)
+    y_scores = np.array([inspector.score_patches(p) for p in test_patches])
     auroc = roc_auc_score(y_true, y_scores)
     y_pred = (y_scores >= threshold).astype(int)
 

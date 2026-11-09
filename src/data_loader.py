@@ -1,6 +1,6 @@
 from pathlib import Path
 from PIL import Image
-from torch.utils.data import Dataset, DataLoader, Subset
+from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import KFold
 from torchvision import transforms
 
@@ -61,16 +61,12 @@ def get_dataloaders(data_dir: str = "data/screw", batch_size: int = 16):
     return train_loader, test_loader
 
 
-def get_cv_folds(data_dir: str = "data/screw", batch_size: int = 16, n_splits: int = 5, seed: int = 0):
+def get_cv_folds(n_samples: int, n_splits: int = 5, seed: int = 0):
     """
     Validation croisée sur les pièces saines de train/good : à chaque tour, une banque est
     construite sur n-1 blocs et le bloc restant sert à calibrer le seuil. On obtient ainsi
     un score "jamais vu" pour chaque pièce saine, sans toucher au jeu de test.
+    Renvoie, pour chaque tour, les indices (train, validation) des images.
     """
-    dataset = ScrewDataset(root_dir=data_dir, split="train")
     kfold = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
-    for train_idx, val_idx in kfold.split(range(len(dataset))):
-        yield (
-            DataLoader(Subset(dataset, train_idx), batch_size=batch_size, shuffle=False),
-            DataLoader(Subset(dataset, val_idx), batch_size=batch_size, shuffle=False),
-        )
+    yield from kfold.split(range(n_samples))

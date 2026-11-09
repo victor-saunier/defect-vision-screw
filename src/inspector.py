@@ -38,15 +38,22 @@ class OpticalInspector:
         # Les aires sont mesurées sur l'image redimensionnée : on ramène 1 px à l'échelle d'origine
         self.pixel_to_mm_ratio = pixel_to_mm_ratio * native_size / img_size
 
-    def _compute_raw_anomaly_map(self, image_tensor: torch.Tensor) -> np.ndarray:
-        raw_map = self.detector.distance_map(image_tensor)
+    @staticmethod
+    def _smooth(distance_map: np.ndarray) -> np.ndarray:
         # Redimensionnement direct sans écrasement Min-Max artificiel
-        raw_map = cv2.resize(raw_map, (224, 224), interpolation=cv2.INTER_LINEAR)
+        raw_map = cv2.resize(distance_map, (224, 224), interpolation=cv2.INTER_LINEAR)
         return cv2.GaussianBlur(raw_map, (9, 9), sigmaX=4)
+
+    def _compute_raw_anomaly_map(self, image_tensor: torch.Tensor) -> np.ndarray:
+        return self._smooth(self.detector.distance_map(image_tensor))
 
     def score(self, image_tensor: torch.Tensor) -> float:
         """Score d'anomalie global : maximum de la carte, même grandeur que le seuil."""
         return float(np.max(self._compute_raw_anomaly_map(image_tensor)))
+
+    def score_patches(self, patches: torch.Tensor) -> float:
+        """Même score à partir des descripteurs [784, 384] déjà extraits (évite de relancer le backbone)."""
+        return float(np.max(self._smooth(self.detector.distance_map_from_patches(patches))))
 
     def inspect(self, image_tensor: torch.Tensor) -> InspectionResult:
         raw_map = self._compute_raw_anomaly_map(image_tensor)
