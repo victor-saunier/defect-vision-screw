@@ -1,5 +1,7 @@
 # Edge-Vision Defect Inspection Pipeline
 
+[![CI](https://github.com/victor-saunier/defect-vision-screw/actions/workflows/ci.yml/badge.svg)](https://github.com/victor-saunier/defect-vision-screw/actions/workflows/ci.yml)
+
 
 
 An end-to-end industrial optical inspection and metrology system implemented in Python, PyTorch, OpenCV, and ONNX Runtime, evaluated on the **MVTec AD** (`screw`) benchmark.
@@ -75,14 +77,14 @@ The decision threshold is a business choice: a lower threshold catches more defe
 
 ### Inference Latency Benchmark (Intel Core i9-13900HX, CPU)
 
-Feature-extraction backbone only (ResNet-18 up to layer3), 224x224x3 frames. Median latency over 200 iterations, ranges observed over 4 runs (the laptop CPU frequency varies between runs, the relative gain stays stable):
+Feature-extraction backbone only (ResNet-18 up to layer3), 224x224x3 frames. Median latency over 200 iterations, ranges observed over 5 runs on a lightly loaded machine (about 10 – 20 % background CPU use). The benchmark is sensitive to the machine load: with other CPU-heavy applications running in the background, the ONNX gain was not reproducible, so it should be run on an otherwise idle machine.
 
 | Runtime Engine | Latency / Frame | Throughput | Latency Reduction |
 | :--- | :---: | :---: | :---: |
-| **PyTorch Native (CPU)** | 9.3 – 15.3 ms | 65 – 108 FPS | Baseline |
-| **ONNX Runtime (CPU)** | **3.5 – 5.1 ms** | **196 – 284 FPS** | **-62 to -70 %** |
+| **PyTorch Native (CPU)** | 8.3 – 8.5 ms | 118 – 121 FPS | Baseline |
+| **ONNX Runtime (CPU)** | **3.2 – 3.3 ms** | **300 – 314 FPS** | **-60 to -62 %** |
 
-These figures cover the backbone only. The complete inspection also runs the k-NN search of every patch against the memory bank, which is not exported to ONNX. Timed once on the same CPU with an ad hoc script (median of 10 runs, not included in the repository): backbone ≈ 12 ms, k-NN search ≈ 154 ms, full `inspect()` ≈ 205 ms, i.e. about **5 images/s** end to end. The ONNX speed-up therefore applies to roughly 6 % of the total time, and the k-NN search is the real bottleneck.
+These figures cover the backbone only. The complete inspection also runs the k-NN search of every patch against the memory bank, which is not exported to ONNX. Timed twice on the same CPU with an ad hoc script (median of 25 to 40 runs each, not included in the repository): backbone ≈ 9 ms, k-NN search ≈ 98 ms, full `inspect()` ≈ 140 – 170 ms (the rest is post-processing, not timed separately), i.e. about **6 – 7 images/s** end to end. The ONNX speed-up therefore applies to roughly 5 – 6 % of the total time, and the k-NN search is the real bottleneck.
 
 
 
@@ -314,7 +316,7 @@ python benchmark_latency.py
 
 * **Calibrated Physical Metrology:** Converts segmented pixel clusters into physical surface measurements (mm²) using an optical calibration factor (50 µm / pixel), with the threshold calibrated (95th percentile) with 5-fold cross-validation on the 320 nominal training parts, never on the test set, and areas rescaled to the native 1024 px resolution.
 
-* **Edge-Optimized Runtime:** Eliminates autograd overhead and leverages AVX/SIMD vectorization via ONNX Runtime, achieving a backbone throughput of roughly **200 – 280 FPS** on a laptop CPU. The complete pipeline, which also includes the k-NN search, runs at about 5 images/s on the same CPU (see the latency section).
+* **Edge-Optimized Runtime:** Eliminates autograd overhead and leverages AVX/SIMD vectorization via ONNX Runtime, achieving a backbone throughput of roughly **300 FPS** on a laptop CPU. The complete pipeline, which also includes the k-NN search, runs at about 6 – 7 images/s on the same CPU (see the latency section).
 
 ---
 
@@ -340,5 +342,5 @@ This is a prototype evaluated on a public benchmark, not a validated production 
 * MVTec provides ground-truth masks (images marking the defective pixels), which this project does not use. The system is evaluated on whether it flags a part, not on whether the area it outlines matches the real defect. Validating areas would require comparing the detected regions with those masks.
 
 **4. The ONNX speed-up covers only a small part of the pipeline.**
-* The ONNX export and the latency table cover the ResNet-18 backbone only. The k-NN search takes about 154 ms against about 12 ms for the backbone (single ad hoc measurement), so the complete pipeline runs at about 5 images/s on the test laptop.
+* The ONNX export and the latency table cover the ResNet-18 backbone only. The k-NN search takes about 98 ms against about 9 ms for the backbone (ad hoc measurement), so the complete pipeline runs at about 6 – 7 images/s on the test laptop.
 * Speeding up the search (for example with an approximate nearest-neighbor library) would be the first lever to try.
