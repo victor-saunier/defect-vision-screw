@@ -367,3 +367,8 @@ This is a prototype evaluated on a public benchmark, not a validated production 
 **4. The ONNX speed-up covers only a small part of the pipeline.**
 * The ONNX export and the latency table cover the ResNet-18 backbone only. The k-NN search takes about 98 ms against about 9 ms for the backbone (ad hoc measurement), so the complete pipeline runs at about 6 – 7 images/s on the test laptop.
 * Speeding up the search (for example with an approximate nearest-neighbor library) would be the first lever to try.
+* The evaluation itself runs with PyTorch, not ONNX Runtime. The exported model's outputs matched PyTorch to within 5e-6 on 8 test images (ad hoc check, not included in the repository).
+
+**5. The tests check the logic, not the accuracy.**
+* The 8 unit tests run on synthetic data (a fake detector and generated images), so the CI needs neither the dataset nor the pretrained weights.
+* A change that lowered the AUROC would not make the CI fail: the full evaluation (`python evaluate.py`) has to be run by hand.
